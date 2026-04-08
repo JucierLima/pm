@@ -1,35 +1,31 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const userModel = require('../models/userModel');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'policial_estudos_secret_key_2024';
+const JWT_SECRET = process.env.JWT_SECRET || 'secreta_super_segura';
 
 const auth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Token não fornecido' });
+  }
+
+  const token = authHeader.split(' ')[1];
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Acesso negado. Token não fornecido.' });
-    }
-
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId);
-
+    const user = userModel.findById(decoded.id);
     if (!user) {
-      return res.status(401).json({ error: 'Usuário não encontrado.' });
+      return res.status(401).json({ error: 'Usuário não encontrado' });
     }
-
     req.user = user;
-    req.token = token;
+    req.userId = user.id;
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Token inválido ou expirado.' });
+    return res.status(401).json({ error: 'Token inválido' });
   }
 };
 
-// Generate JWT token
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: '7d' });
 };
 
-module.exports = { auth, generateToken, JWT_SECRET };
-
+module.exports = { auth, generateToken };

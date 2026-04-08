@@ -47,8 +47,8 @@ const Study = () => {
   const startSession = async (materia, dificuldade) => {
     setLoading(true);
     try {
-      const response = await axios.get(`/questions/session?materia=${materia}&dificuldade=${dificuldade}`);
-      setQuestions(response.data.questions);
+      const response = await axios.get(`/questions/session?materia=${encodeURIComponent(materia)}&dificuldade=${dificuldade}&limit=10`);
+      setQuestions(response.data);
       setSelectedMateria(materia);
       setSelectedDificuldade(dificuldade);
       setSessionStarted(true);
@@ -63,6 +63,11 @@ const Study = () => {
     }
   };
 
+  const getAlternativas = (q) => {
+    if (Array.isArray(q.alternativas)) return q.alternativas;
+    return [q.alternativaA, q.alternativaB, q.alternativaC, q.alternativaD, q.alternativaE];
+  };
+
   const handleAnswer = async (answerIndex) => {
     if (showResult) return;
 
@@ -70,15 +75,19 @@ const Study = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`/questions/${questions[currentIndex]._id}/answer`, {
-        respostaUsuario: answerIndex
+      const currentQ = questions[currentIndex];
+      const response = await axios.post(`/questions/${currentQ.id}/answer`, {
+        selectedAnswer: answerIndex,
+        isCorrect: false,
+        timeSpent: 0,
+        materia: selectedMateria,
       });
 
       setResult(response.data);
       setShowResult(true);
 
       if (!response.data.correta) {
-        setWrongQuestions(prev => [...prev, questions[currentIndex]._id]);
+        setWrongQuestions(prev => [...prev, currentQ.id]);
       }
     } catch (error) {
       console.error('Erro ao responder:', error);
@@ -106,7 +115,7 @@ const Study = () => {
       await axios.post('/progress/attempt', {
         materia: selectedMateria,
         modo: 'estudo',
-        questoes: questions.map(q => ({ questao: q._id })),
+        questoes: questions.map(q => ({ questao: q.id })),
         acertos,
         erros,
         experienciaGanha: acertos * 10 + erros * 2,
@@ -114,14 +123,12 @@ const Study = () => {
         questoesErradas: wrongQuestions
       });
 
-      // Refresh user data
       const userResponse = await axios.get('/auth/me');
       updateUser(userResponse.data);
     } catch (error) {
       console.error('Erro ao salvar resultado:', error);
     }
 
-    // If there are wrong questions, start review mode
     if (wrongQuestions.length > 0 && !reviewMode) {
       startReviewSession();
     } else {
@@ -132,9 +139,9 @@ const Study = () => {
   const startReviewSession = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('/questions/review/wrong', {
-        questionIds: wrongQuestions
-      });
+      const questionIdsStr = wrongQuestions.join(',');
+      const response = await axios.get(`/questions/review/wrong?questionIds=${questionIdsStr}`);
+
       setQuestions(response.data.questions);
       setCurrentIndex(0);
       setSelectedAnswer(null);
@@ -151,7 +158,6 @@ const Study = () => {
 
   const currentQuestion = questions[currentIndex];
 
-  // Subject selection screen
   if (!sessionStarted) {
     return (
       <div className="study-page">
@@ -197,7 +203,6 @@ const Study = () => {
     );
   }
 
-  // Loading state
   if (loading && !currentQuestion) {
     return (
       <div className="study-page">
@@ -209,7 +214,6 @@ const Study = () => {
     );
   }
 
-  // No questions available
   if (!currentQuestion) {
     return (
       <div className="study-page">
@@ -244,7 +248,7 @@ const Study = () => {
           {questions.map((_, idx) => (
             <span 
               key={idx} 
-              className={`dot ${idx === currentIndex ? 'active' : ''} ${idx < currentIndex ? (wrongQuestions.includes(questions[idx]._id) ? 'wrong' : 'correct') : ''}`}
+              className={`dot ${idx === currentIndex ? 'active' : ''} ${idx < currentIndex ? (wrongQuestions.includes(questions[idx].id) ? 'wrong' : 'correct') : ''}`}
             />
           ))}
         </div>
@@ -260,15 +264,15 @@ const Study = () => {
           <p className="question-text">{currentQuestion.enunciado}</p>
 
           <div className="alternatives">
-            {currentQuestion.alternativas.map((alt, idx) => (
+            {getAlternativas(currentQuestion).map((alt, idx) => (
               <button
                 key={idx}
                 className={`alternative-btn ${selectedAnswer === idx ? 'selected' : ''} ${
-                  showResult 
-                    ? idx === currentQuestion.respostaCorreta 
-                      ? 'correct' 
-                      : selectedAnswer === idx 
-                        ? 'wrong' 
+                  showResult
+                    ? idx === result?.respostaCorreta
+                      ? 'correct'
+                      : selectedAnswer === idx
+                        ? 'wrong'
                         : ''
                     : ''
                 }`}
@@ -303,9 +307,22 @@ const Study = () => {
                 <span>XP Gain: +{result.experienciaGanha}</span>
               </div>
 
-              <button className="btn btn-primary" onClick={nextQuestion}>
-                {currentIndex < questions.length - 1 ? 'Próxima Questão' : wrongQuestions.length > 0 && !reviewMode ? 'Revisar Erradas' : 'Finalizar'}
-              </button>
+              <div className="result-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => navigate('/questao', {
+                    state: {
+                      question: { ...currentQuestion, respostaCorreta: result.respostaCorreta },
+                      userChoice: selectedAnswer
+                    }
+                  })}
+                >
+                  Ver Análise
+                </button>
+                <button className="btn btn-primary" onClick={nextQuestion}>
+                  {currentIndex < questions.length - 1 ? 'Próxima Questão' : wrongQuestions.length > 0 && !reviewMode ? 'Revisar Erradas' : 'Finalizar'}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -315,4 +332,3 @@ const Study = () => {
 };
 
 export default Study;
-

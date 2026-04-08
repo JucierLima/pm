@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
@@ -12,12 +12,23 @@ import Simulation from './pages/Simulation';
 import Ranking from './pages/Ranking';
 import Profile from './pages/Profile';
 import Stats from './pages/Stats';
+import QuestionDetail from './pages/QuestionDetail';
 
 // Components
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
   const { loading } = useAuth();
+  const [installPrompt, setInstallPrompt] = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
   if (loading) {
     return (
@@ -35,7 +46,7 @@ function App() {
       
       <Route path="/" element={
         <PrivateRoute>
-          <Dashboard />
+          <Dashboard installPrompt={installPrompt} onInstalled={() => setInstallPrompt(null)} />
         </PrivateRoute>
       } />
       
@@ -84,6 +95,12 @@ function App() {
       <Route path="/perfil" element={
         <PrivateRoute>
           <Profile />
+        </PrivateRoute>
+      } />
+
+      <Route path="/questao" element={
+        <PrivateRoute>
+          <QuestionDetail />
         </PrivateRoute>
       } />
       

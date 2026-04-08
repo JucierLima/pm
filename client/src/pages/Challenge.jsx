@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import './Challenge.css';
+import QuizComplete from '../components/QuizComplete';
 
 const Challenge = () => {
   const { user } = useAuth();
@@ -16,7 +17,8 @@ const Challenge = () => {
   const [error, setError] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [results, setResults] = useState(null);
-  const [startTime] = useState(Date.now());
+const [startTime] = useState(Date.now());
+  const [answers, setAnswers] = useState([]); 
   
   const { materia, dificuldade } = useParams();
 
@@ -27,12 +29,7 @@ const Challenge = () => {
   const fetchQuestions = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (materia) params.append('materia', materia);
-      if (dificuldade) params.append('dificuldade', dificuldade);
-      params.append('limit', '10');
-      
-      const response = await axios.get(`/questions/session?${params.toString()}`);
+`/questions/session?materia=${encodeURIComponent(materia || 'Língua Portuguesa')}&dificuldade=${dificuldade || 'Médio'}&limit=10`
       setQuestions(response.data.questions);
     } catch (err) {
       setError('Erro ao carregar questões. Tente novamente.');
@@ -50,19 +47,23 @@ const Challenge = () => {
   const submitAnswer = async () => {
     if (selectedAnswer === null) return;
     
-    const question = questions[currentIndex];
-    const isCorrect = selectedAnswer === question.respostaCorreta;
-    
     setShowFeedback(true);
+    setLoading(true);
     
-    // Update question stats
     try {
-      await axios.post(`/questions/${question._id}/answer`, {
-        resposta: selectedAnswer,
-        correta: isCorrect
+      const response = await axios.post(`/questions/${questions[currentIndex]._id}/answer`, {
+        respostaUsuario: selectedAnswer
       });
+      
+      const isCorrect = response.data.correta;
+      
+      // Update question stats (already done server)
+setResult(response.data);
+      setAnswers(prev => [...prev, { correta: response.data.correta }]);
     } catch (err) {
       console.error('Error updating stats:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,10 +83,7 @@ const Challenge = () => {
     const timeSpent = Math.floor((endTime - startTime) / 1000);
     
     // Calculate correct answers
-    const correctAnswers = questions.filter((q, idx) => {
-      // We need to track user answers - for now calculate from results
-      return false;
-    }).length;
+          const acertos = answers.filter(a => a.correta).length;
 
     try {
       const response = await axios.post('/progress/attempt', {
@@ -143,42 +141,7 @@ const Challenge = () => {
     );
   }
 
-  if (completed) {
-    return (
-      <div className="challenge-page">
-        <div className="results-container">
-          <h2>🏆 Desafio Concluído!</h2>
-          
-          <div className="results-stats">
-            <div className="result-stat">
-              <span className="stat-icon">⏱️</span>
-              <span className="stat-value">{Math.floor((Date.now() - startTime) / 1000)}s</span>
-              <span className="stat-label">Tempo</span>
-            </div>
-          </div>
-          
-          <div className="motivational-phrase">
-            <p>"A persistência é o caminho do êxito."</p>
-          </div>
-          
-          <div className="results-actions">
-            <button className="btn btn-primary" onClick={() => navigate('/')}>
-              Voltar ao Início
-            </button>
-            <button className="btn btn-outline" onClick={() => {
-              setCompleted(false);
-              setCurrentIndex(0);
-              setSelectedAnswer(null);
-              setShowFeedback(false);
-              fetchQuestions();
-            }}>
-              Novo Desafio
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   const currentQuestion = questions[currentIndex];
 

@@ -21,7 +21,7 @@ const Ranking = () => {
         axios.get('/ranking?limit=20'),
         axios.get('/ranking/me')
       ]);
-      setRanking(rankingRes.data);
+      setRanking(rankingRes.data.ranking);
       setUserPosition(positionRes.data);
     } catch (error) {
       console.error('Erro ao buscar ranking:', error);
@@ -85,7 +85,7 @@ const Ranking = () => {
           ) : (
             ranking.map((entry, index) => (
               <div 
-                key={entry._id || index} 
+                key={entry.apelido || index} 
                 className={`ranking-item ${getRankClass(entry.posicao)} ${entry.apelido === user?.apelido ? 'highlight' : ''}`}
               >
                 <div className="rank-position">

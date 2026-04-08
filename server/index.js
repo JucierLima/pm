@@ -1,17 +1,27 @@
 require('dotenv').config();
+require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/auth-fixed');
 const questionRoutes = require('./routes/questions');
 const progressRoutes = require('./routes/progress');
 const rankingRoutes = require('./routes/ranking');
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// CORS — restringe origens permitidas via env para funcionar em dev e prod
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173').split(',');
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permite requisições sem origin (ex: curl, Postman) e origens na lista
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS bloqueado para origem: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+}));
+
 app.use(express.json());
 
 // Routes
@@ -25,12 +35,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Policial Estudos API Running' });
 });
 
-// Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/policial_estudos';
-
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ Conectado ao MongoDB'))
-  .catch(err => console.error('❌ Erro ao conectar ao MongoDB:', err));
+// Inicializar bancos de dados
+require('./database/usersDb');
+require('./database/questionsDb');
 
 const PORT = process.env.PORT || 5000;
 

@@ -98,7 +98,7 @@ const Stats = () => {
               <span className="level-subtitle">Nível {user?.nivel}</span>
             </div>
             <div className="level-exp">
-              <span className="exp-value">{user?.experiencia}</span>
+              <span className="exp-value">{user?.xp}</span>
               <span className="exp-label">XP Total</span>
             </div>
           </div>
@@ -106,10 +106,10 @@ const Stats = () => {
             <div className="progress-bar">
               <div 
                 className="progress-bar-fill" 
-                style={{ width: `${(user?.experiencia % 100)}%` }}
+                style={{ width: `${(user?.xp % 100)}%` }}
               ></div>
             </div>
-            <span className="progress-text">{100 - (user?.experiencia % 100)} XP para próximo nível</span>
+            <span className="progress-text">{100 - (user?.xp % 100)} XP para próximo nível</span>
           </div>
         </div>
 
@@ -122,9 +122,9 @@ const Stats = () => {
               {[...stats.bySubject]
                 .sort((a, b) => b.percentual - a.percentual)
                 .map((subject) => (
-                  <div key={subject._id} className="subject-stat-item">
+                  <div key={subject.materia} className="subject-stat-item">
                     <div className="subject-info">
-                      <span className="subject-name">{subject._id}</span>
+                      <span className="subject-name">{subject.materia}</span>
                       <span className="subject-stats">
                         {subject.acertos}/{subject.total}
                       </span>
@@ -157,12 +157,12 @@ const Stats = () => {
           <div className="performance-comparison">
             <div className="comparison-card best">
               <h4>🌟 Matéria Mais Forte</h4>
-              <span className="subject-name">{stats.strongest._id}</span>
+              <span className="subject-name">{stats.strongest.materia}</span>
               <span className="subject-percent">{stats.strongest.percentual}%</span>
             </div>
             <div className="comparison-card worst">
               <h4>📚 Precisa Melhorar</h4>
-              <span className="subject-name">{stats.weakest._id}</span>
+              <span className="subject-name">{stats.weakest.materia}</span>
               <span className="subject-percent">{stats.weakest.percentual}%</span>
             </div>
           </div>
@@ -175,7 +175,7 @@ const Stats = () => {
           {history && history.length > 0 ? (
             <div className="history-list">
               {history.map((attempt) => (
-                <div key={attempt._id} className="history-item">
+                <div key={attempt.id} className="history-item">
                   <div className="history-info">
                     <span className="history-mode">{modeLabels[attempt.modo]}</span>
                     <span className="history-date">

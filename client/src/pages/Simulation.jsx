@@ -51,8 +51,14 @@ const Simulation = () => {
       // Get questions from all selected subjects
       let allQuestions = [];
       for (const subject of selectedSubjects) {
-        const response = await axios.get(`/questions/session?materia=${subject}&dificuldade=Médio`);
-        allQuestions = [...allQuestions, ...response.data.questions];
+        const res = await axios.get(`/questions/session`, {
+          params: {
+            materia: subject,
+            dificuldade: 'Médio',
+            limit: 5
+          }
+        });
+        allQuestions = [...allQuestions, ...res.data.questions];
       }
 
       // Shuffle and take 20 questions for simulation

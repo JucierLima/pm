@@ -1,29 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
+const db = require('../database/usersDb');
 const { auth } = require('../middlewares/auth');
 
-// Get global ranking
+// Get global ranking — consulta real no SQLite
 router.get('/', async (req, res) => {
   try {
     const { limit = 20 } = req.query;
-    
-    const ranking = await User.find()
-      .sort({ experiencia: -1 })
-      .limit(parseInt(limit))
-      .select('apelido patente nivel experiencia')
-      .lean();
+    const rows = db.prepare(`
+      SELECT apelido, patente, nivel, xp AS experiencia
+      FROM users
+      ORDER BY xp DESC, nivel DESC
+      LIMIT ?
+    `).all(parseInt(limit));
 
-    // Add position to each user
-    const rankingWithPosition = ranking.map((user, index) => ({
-      posicao: index + 1,
-      apelido: user.apelido,
-      patente: user.patente,
-      nivel: user.nivel,
-      experiencia: user.experiencia
-    }));
-
-    res.json(rankingWithPosition);
+    const ranking = rows.map((row, i) => ({ posicao: i + 1, ...row }));
+    res.json({ ranking });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar ranking.' });
   }
@@ -32,83 +24,23 @@ router.get('/', async (req, res) => {
 // Get user position in ranking
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = req.user;
-    
-    // Count how many users have more experience
-    const position = await User.countDocuments({
-      experiencia: { $gt: user.experiencia }
-    }) + 1;
+    const countAbove = db.prepare(
+      'SELECT COUNT(*) AS count FROM users WHERE xp > ?'
+    ).get(req.user.xp).count;
 
-    const totalUsers = await User.countDocuments();
-
-    // Get surrounding users
-    const aboveUsers = await User.find({
-      experiencia: { $gt: user.experiencia }
-    })
-      .sort({ experiencia: 1 })
-      .limit(2)
-      .select('apelido patente nivel experiencia');
-
-    const belowUsers = await User.find({
-      experiencia: { $lt: user.experiencia }
-    })
-      .sort({ experiencia: -1 })
-      .limit(2)
-      .select('apelido patente nivel experiencia');
+    const totalUsuarios = db.prepare('SELECT COUNT(*) AS count FROM users').get().count;
 
     res.json({
-      posicao: position,
-      totalUsuarios: totalUsers,
-      apelido: user.apelido,
-      patente: user.patente,
-      nivel: user.nivel,
-      experiencia: user.experiencia,
-      acima: aboveUsers.reverse(),
-      abaixo: belowUsers
+      posicao: countAbove + 1,
+      totalUsuarios,
+      apelido: req.user.apelido,
+      patente: req.user.patente || 'Soldado',
+      nivel: req.user.nivel || 1,
+      experiencia: req.user.xp || 0,
     });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar posição no ranking.' });
   }
 });
 
-// Get ranking by subject
-router.get('/materia/:materia', async (req, res) => {
-  try {
-    const { materia } = req.params;
-    const { limit = 20 } = req.query;
-    
-    // This would require a more complex aggregation
-    // For now, return a message that this feature needs implementation
-    res.json({
-      message: `Ranking por ${materia} em desenvolvimento.`,
-      nota: 'Esta funcionalidade requer rastreamento adicional por matéria.'
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar ranking por matéria.' });
-  }
-});
-
-// Get top performers of the week
-router.get('/semana', async (req, res) => {
-  try {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-    // This would require tracking weekly XP
-    // For now, return overall ranking with a note
-    const ranking = await User.find()
-      .sort({ experiencia: -1 })
-      .limit(10)
-      .select('apelido patente nivel experiencia');
-
-    res.json({
-      message: 'Ranking semanal em desenvolvimento.',
-      top10: ranking
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar ranking semanal.' });
-  }
-});
-
 module.exports = router;
-

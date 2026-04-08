@@ -18,22 +18,13 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if nickname already exists
-    const existingUser = await User.findOne({ apelido: apelido.toLowerCase() });
+    const existingUser = await User.findByNickname(apelido);
     if (existingUser) {
       return res.status(400).json({ error: 'Este apelido já está em uso.' });
     }
 
     // Create user
-    const user = new User({
-      nome,
-      apelido: apelido.toLowerCase(),
-      senha,
-      experiencia: 0,
-      patente: 'Soldado',
-      nivel: 1
-    });
-
-    await user.save();
+    const newUser = await User.create(nome, apelido, senha);
 
     // Generate token
     const token = generateToken(user._id);
@@ -66,7 +57,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user
-    const user = await User.findOne({ apelido: apelido.toLowerCase() });
+    const user = await User.findByNickname(apelido);
     if (!user) {
       return res.status(401).json({ error: 'Apelido ou senha incorretos.' });
     }
@@ -148,7 +139,7 @@ router.put('/profile', auth, async (req, res) => {
 
     if (nome) user.nome = nome;
     if (apelido && apelido !== user.apelido) {
-      const existingUser = await User.findOne({ apelido: apelido.toLowerCase() });
+      const existingUser = await User.findByNickname(apelido);
       if (existingUser) {
         return res.status(400).json({ error: 'Este apelido já está em uso.' });
       }

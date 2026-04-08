@@ -1,0 +1,46 @@
+.install-banner {
+  background: linear-gradient(135deg, #004a99 0%, #003580 100%);
+  color: white;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 1rem 0.5rem;
+  box-shadow: 0 4px 15px rgba(0, 74, 153, 0.3);
+  gap: 1rem;
+}
+
+.install-text strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.install-text p {
+  font-size: 0.8rem;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.install-btn {
+  background: white;
+  color: #004a99;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.install-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}

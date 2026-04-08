@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const Progress = require('../models/Progress');
-const Attempt = require('../models/Attempt');
-const User = require('../models/User');
+const progressModel = require('../models/progressModel');
+const attemptModel = require('../models/attemptModel');
+const userModel = require('../models/userModel');
 const { auth } = require('../middlewares/auth');
 
 // Get user progress for all subjects
 router.get('/', auth, async (req, res) => {
   try {
-    const progress = await Progress.find({ usuario: req.user._id });
+    const progress = progressModel.getProgressByUser(req.userId);
     res.json(progress);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar progresso.' });
@@ -18,10 +18,7 @@ router.get('/', auth, async (req, res) => {
 // Get progress for specific subject
 router.get('/:materia', auth, async (req, res) => {
   try {
-    const progress = await Progress.findOne({ 
-      usuario: req.user._id, 
-      materia: req.params.materia 
-    });
+    const progress = progressModel.getProgressBySubject(req.userId, req.params.materia);
     
     if (!progress) {
       return res.json({
@@ -45,8 +42,8 @@ router.post('/attempt', auth, async (req, res) => {
     const { materia, modo, questoes, acertos, erros, experienciaGanha, tempoTotal, questoesErradas } = req.body;
 
     // Create attempt record
-    const attempt = new Attempt({
-      usuario: req.user._id,
+    attemptModel.createAttempt({
+      usuario: req.userId,
       materia,
       modo,
       questoes,
@@ -60,67 +57,14 @@ router.post('/attempt', auth, async (req, res) => {
       completed: true
     });
 
-    await attempt.save();
-
-    // Update user experience
-    const user = req.user;
-    user.experiencia += experienciaGanha;
-    user.patente = user.calcularPatente();
-    user.nivel = user.calcularNivel();
-    await user.save();
+    // Update user XP (simplified - full logic in model)
+    userModel.updateXpAndLevel(req.userId, experienciaGanha);
 
     // Update progress for this subject
-    let progress = await Progress.findOne({ 
-      usuario: req.user._id, 
-      materia 
-    });
-
-    if (!progress) {
-      progress = new Progress({
-        usuario: req.user._id,
-        materia,
-        totalQuestoes: questoes.length,
-        acertos,
-        erros: questoes.length - acertos,
-        percentualAcertos: Math.round((acertos / questoes.length) * 100)
-      });
-    } else {
-      progress.totalQuestoes += questoes.length;
-      progress.acertos += acertos;
-      progress.erros += erros;
-      progress.percentualAcertos = Math.round((progress.acertos / progress.totalQuestoes) * 100);
-      progress.ultimaAtualizacao = new Date();
-    }
-
-    await progress.save();
-
-    // Check for achievements
-    const achievements = [];
-    
-    // First attempt
-    const totalAttempts = await Attempt.countDocuments({ usuario: req.user._id });
-    if (totalAttempts === 1) {
-      achievements.push('Primeiro passo');
-    }
-    
-    // Streak achievements
-    if (user.sequenciaDias >= 7) achievements.push('Semana de aço');
-    if (user.sequenciaDias >= 30) achievements.push('Mês de campeão');
-    
-    // Master subject (90%+ in a subject)
-    if (progress.percentualAcertos >= 90) {
-      achievements.push(`Mestre em ${materia}`);
-    }
+    progressModel.updateProgress(req.userId, materia, acertos, questoes.length);
 
     res.json({
       message: 'Resultado salvo com sucesso!',
-      attempt,
-      user: {
-        experiencia: user.experiencia,
-        patente: user.patente,
-        nivel: user.nivel
-      },
-      achievements,
       nextQuestions: questoesErradas
     });
   } catch (error) {
@@ -134,20 +78,9 @@ router.get('/history', auth, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     
-    const attempts = await Attempt.find({ usuario: req.user._id, completed: true })
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit))
-      .populate('questoes.questao', 'materia dificuldade');
+    const history = attemptModel.getAttemptsByUser(req.userId, parseInt(limit), parseInt(page));
 
-    const total = await Attempt.countDocuments({ usuario: req.user._id, completed: true });
-
-    res.json({
-      attempts,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
-      total
-    });
+    res.json(history);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar histórico.' });
   }
@@ -156,55 +89,8 @@ router.get('/history', auth, async (req, res) => {
 // Get study statistics
 router.get('/stats', auth, async (req, res) => {
   try {
-    const user = req.user;
-    
-    // Total attempts
-    const totalAttempts = await Attempt.countDocuments({ usuario: user._id, completed: true });
-    
-    // Total questions answered
-    const totalQuestions = await Attempt.aggregate([
-      { $match: { usuario: user._id, completed: true } },
-      { $group: { _id: null, total: { $sum: '$totalQuestoes' } } }
-    ]);
-    
-    // Overall accuracy
-    const accuracyData = await Attempt.aggregate([
-      { $match: { usuario: user._id, completed: true } },
-      { $group: { 
-        _id: null, 
-        totalAcertos: { $sum: '$acertos' },
-        totalQuestoes: { $sum: '$totalQuestoes' }
-      } }
-    ]);
-    
-    // By subject
-    const bySubject = await Attempt.aggregate([
-      { $match: { usuario: user._id, completed: true } },
-      { $group: { 
-        _id: '$materia', 
-        acertos: { $sum: '$acertos' },
-        total: { $sum: '$totalQuestoes' }
-      } },
-      { $addFields: { percentual: { $round: [{ $multiply: [{ $divide: ['$acertos', '$total'] }, 100] }, 0] } } }
-    ]);
-
-    // Strongest and weakest subjects
-    const sortedBySubject = [...bySubject].sort((a, b) => b.percentual - a.percentual);
-    const strongest = sortedBySubject[0] || null;
-    const weakest = sortedBySubject[sortedBySubject.length - 1] || null;
-
-    res.json({
-      totalAttempts,
-      totalQuestions: totalQuestions[0]?.total || 0,
-      overallAccuracy: accuracyData[0] ? Math.round((accuracyData[0].totalAcertos / accuracyData[0].totalQuestoes) * 100) : 0,
-      bySubject,
-      strongest,
-      weakest,
-      streak: user.sequenciaDias,
-      level: user.nivel,
-      experience: user.experiencia,
-      rank: user.patente
-    });
+    const stats = await attemptModel.getStatistics(req.userId);
+    res.json(stats);
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
     res.status(500).json({ error: 'Erro ao buscar estatísticas.' });
@@ -212,4 +98,3 @@ router.get('/stats', auth, async (req, res) => {
 });
 
 module.exports = router;
-

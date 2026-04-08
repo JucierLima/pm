@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import axios from 'axios';
+import InstallButton from '../components/InstallButton';
 import './Dashboard.css';
 
-const Dashboard = () => {
+const Dashboard = ({ installPrompt, onInstalled }) => {
   const { user, logout, updateUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -77,13 +78,15 @@ const Dashboard = () => {
         </div>
       </header>
 
+      <InstallButton prompt={installPrompt} onInstalled={onInstalled} />
+
       <div className="dashboard-welcome">
         <div className="welcome-card">
           <div className="welcome-info">
             <span className="rank-icon">{rankIcons[user?.patente]}</span>
             <div>
               <h2>Bem-vindo, {user?.patente} {user?.nome}!</h2>
-              <p className="level-info">Nível {user?.nivel} • {user?.experiencia} XP</p>
+              <p className="level-info">Nível {user?.nivel} • {user?.xp} XP</p>
             </div>
           </div>
           <div className="streak-badge">
@@ -145,7 +148,7 @@ const Dashboard = () => {
         </div>
         <div className="subjects-grid">
           {subjects.map((subject) => {
-            const subjectStats = stats?.bySubject?.find(s => s._id === subject.id);
+            const subjectStats = stats?.bySubject?.find(s => s.materia === subject.id);
             return (
               <Link 
                 to={`/estudar/${subject.id}/Médio`} 

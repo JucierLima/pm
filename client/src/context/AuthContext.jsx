@@ -3,6 +3,10 @@ import axios from 'axios';
 
 const AuthContext = createContext(null);
 
+// Configurado uma vez fora do componente — evita reatribuição a cada render
+// O proxy do vite.config.js redireciona /api → http://localhost:5000/api em dev
+axios.defaults.baseURL = '/api';
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -16,10 +20,6 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
 
-  // Configure axios base URL
-  axios.defaults.baseURL = 'http://localhost:5000/api';
-
-  // Set authorization header
   if (token) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }

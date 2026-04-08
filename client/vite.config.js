@@ -7,12 +7,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-controlled.svg'],
       manifest: {
-        name: 'Policial Estudos',
-        short_name: 'PolicialEstudos',
-        description: 'Plataforma de estudos gamificada para concursos policiais',
-        theme_color: '#1a365d',
+        name: 'PM-PE Estudos: Policial',
+        short_name: 'PMPE-Estudos',
+        description: 'App de simulados e questões para o concurso da PM-PE',
+        theme_color: '#004a99',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
@@ -27,7 +27,23 @@ export default defineConfig({
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ]
+      },
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/api'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24
+              }
+            }
           }
         ]
       }
@@ -43,4 +59,3 @@ export default defineConfig({
     }
   }
 });
-
